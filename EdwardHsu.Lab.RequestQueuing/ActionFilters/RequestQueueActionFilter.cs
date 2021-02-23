@@ -21,20 +21,29 @@ namespace EdwardHsu.Lab.RequestQueuing.ActionFilters
             {
                 var queueAttr = cad.MethodInfo.GetCustomAttribute<RequestQueueAttribute>();
 
+                if (queueAttr == null)
+                {
+                    await next();
+                    return;
+                }
+
                 var tcs = new TaskCompletionSource();
 
-                var queue = _requestQueue.GetOrAdd(queueAttr.Identifier, new ActionBlock<(ActionExecutionDelegate, TaskCompletionSource)>(async ((ActionExecutionDelegate _next, TaskCompletionSource _tcs) input) =>
-                {
-                    try
-                    {
-                        await input._next();
-                        input._tcs.SetResult();
-                    }
-                    catch (Exception e)
-                    {
-                        input._tcs.SetException(e);
-                    }
-                }));
+                var queue = _requestQueue.GetOrAdd(
+                    queueAttr.Identifier,
+                    new ActionBlock<(ActionExecutionDelegate, TaskCompletionSource)>(
+                        async ((ActionExecutionDelegate _next, TaskCompletionSource _tcs) input) =>
+                        {
+                            try
+                            {
+                                await input._next();
+                                input._tcs.SetResult();
+                            }
+                            catch (Exception e)
+                            {
+                                input._tcs.SetException(e);
+                            }
+                        }));
 
                 queue.Post((next, tcs));
 
